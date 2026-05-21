@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — HortFrut HORT{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1 class="page-title">Dashboard <span class="accent">HORT</span></h1>
+  <p class="page-sub">Visão geral do estoque de hortifrutigranjeiros</p>
+</div>
+
+<div class="stat-grid" id="statGrid">
+  <div class="stat-card loading">
+    <div class="stat-icon">🧅</div>
+    <div class="stat-info">
+      <span class="stat-label">Cebola Amarela</span>
+      <span class="stat-value" id="s-cebola_amarela">—</span>
+    </div>
+  </div>
+  <div class="stat-card loading">
+    <div class="stat-icon">🟣</div>
+    <div class="stat-info">
+      <span class="stat-label">Cebola Roxa</span>
+      <span class="stat-value" id="s-cebola_roxa">—</span>
+    </div>
+  </div>
+  <div class="stat-card loading">
+    <div class="stat-icon">🧄</div>
+    <div class="stat-info">
+      <span class="stat-label">Alho</span>
+      <span class="stat-value" id="s-alho">—</span>
+    </div>
+  </div>
+  <div class="stat-card loading">
+    <div class="stat-icon">🧅</div>
+    <div class="stat-info">
+      <span class="stat-label">Cebola Miúda</span>
+      <span class="stat-value" id="s-cebola_miuda">—</span>
+    </div>
+  </div>
+</div>
+
+<div class="dashboard-grid">
+  <div class="card">
+    <div class="card-header">
+      <h2 class="card-title">Estoque Atual</h2>
+      <a href="/estoque" class="btn btn-sm btn-outline">Ver tudo →</a>
+    </div>
+    <div id="dashProdutos" class="product-list"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <h2 class="card-title">Últimos Movimentos</h2>
+      <a href="/movimentos" class="btn btn-sm btn-outline">Ver tudo →</a>
+    </div>
+    <div id="dashMovimentos" class="movement-list"></div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function loadDashboard() {
+  const [resumo, produtos, movimentos] = await Promise.all([
+    api('/api/produtos/resumo'),
+    api('/api/produtos'),
+    api('/api/movimentos'),
+  ]);
+
+  const cats = {cebola_amarela:'s-cebola_amarela', cebola_roxa:'s-cebola_roxa', alho:'s-alho', cebola_miuda:'s-cebola_miuda'};
+  document.querySelectorAll('.stat-card').forEach(c => c.classList.remove('loading'));
+  for (const [cat, elId] of Object.entries(cats)) {
+    const d = resumo[cat];
+    const el = document.getElementById(elId);
+    if (d) el.textContent = `${d.total_kg.toFixed(0)} kg`;
+    else el.textContent = '0 kg';
+  }
+
+  const pl = document.getElementById('dashProdutos');
+  pl.innerHTML = produtos.slice(0,6).map(p => `
+    <div class="product-row">
+      <span class="product-name">${p.nome}</span>
+      <div class="product-badges">
+        <span class="badge badge-kg">${p.unidade_kg.toFixed(1)} kg</span>
+        ${p.unidade_sacos > 0 ? `<span class="badge badge-sacos">${p.unidade_sacos} sc</span>` : ''}
+        ${p.unidade_caixas > 0 ? `<span class="badge badge-caixas">${p.unidade_caixas} cx</span>` : ''}
+      </div>
+    </div>
+  `).join('');
+
+  const ml = document.getElementById('dashMovimentos');
+  ml.innerHTML = movimentos.slice(0,8).map(m => `
+    <div class="movement-row">
+      <span class="mov-type ${m.tipo}">${m.tipo === 'entrada' ? '▲' : '▼'} ${m.tipo}</span>
+      <span class="mov-name">${m.produto_nome}</span>
+      <span class="mov-qty">${m.quantidade_kg.toFixed(1)} kg</span>
+      <span class="mov-date">${m.data}</span>
+    </div>
+  `).join('') || '<p class="empty">Nenhum movimento registrado.</p>';
+}
+
+loadDashboard();
+</script>
+{% endblock %}

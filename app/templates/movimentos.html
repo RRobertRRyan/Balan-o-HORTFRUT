@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+{% block title %}Movimentos — HortFrut HORT{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Movimentos <span class="accent">HORT</span></h1>
+    <p class="page-sub">Registre entradas e saídas de estoque</p>
+  </div>
+  <button class="btn btn-primary" onclick="openModal('modalMov')">+ Novo Movimento</button>
+</div>
+
+<div class="filter-bar">
+  <button class="filter-btn active" onclick="setFiltro('', this)">Todos</button>
+  <button class="filter-btn entrada" onclick="setFiltro('entrada', this)">▲ Entradas</button>
+  <button class="filter-btn saida" onclick="setFiltro('saida', this)">▼ Saídas</button>
+</div>
+
+<div class="card">
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Tipo</th>
+        <th>Produto</th>
+        <th>KG</th>
+        <th>Sacos</th>
+        <th>Caixas</th>
+        <th>Observação</th>
+        <th>Data</th>
+      </tr>
+    </thead>
+    <tbody id="tbodyMov"></tbody>
+  </table>
+</div>
+
+<!-- Modal Movimento -->
+<div class="modal-overlay hidden" id="modalMov">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>Novo Movimento</h3>
+      <button class="modal-close" onclick="closeModal('modalMov')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="tipo-toggle">
+        <button class="toggle-btn active entrada-btn" onclick="setTipo('entrada', this)">▲ Entrada</button>
+        <button class="toggle-btn saida-btn" onclick="setTipo('saida', this)">▼ Saída</button>
+      </div>
+      <input type="hidden" id="movTipo" value="entrada">
+      <div class="form-group">
+        <label>Produto</label>
+        <select class="form-input" id="movProduto"></select>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>KG</label>
+          <input class="form-input" type="number" id="movKg" placeholder="0.00" step="0.01">
+        </div>
+        <div class="form-group">
+          <label>Sacos (UN)</label>
+          <input class="form-input" type="number" id="movSacos" placeholder="0">
+        </div>
+        <div class="form-group">
+          <label>Caixas (UN)</label>
+          <input class="form-input" type="number" id="movCaixas" placeholder="0">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Observação</label>
+        <input class="form-input" type="text" id="movObs" placeholder="Opcional...">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modalMov')">Cancelar</button>
+      <button class="btn btn-primary" onclick="salvarMov()">Registrar</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let filtroAtivo = '';
+
+async function loadMovimentos() {
+  const url = filtroAtivo ? `/api/movimentos?tipo=${filtroAtivo}` : '/api/movimentos';
+  const movs = await api(url);
+  const tbody = document.getElementById('tbodyMov');
+  tbody.innerHTML = movs.map(m => `
+    <tr>
+      <td><span class="mov-pill ${m.tipo}">${m.tipo === 'entrada' ? '▲ Entrada' : '▼ Saída'}</span></td>
+      <td><strong>${m.produto_nome}</strong></td>
+      <td class="num">${m.quantidade_kg.toFixed(2)}</td>
+      <td class="num">${m.quantidade_sacos}</td>
+      <td class="num">${m.quantidade_caixas}</td>
+      <td>${m.observacao || '—'}</td>
+      <td class="date-cell">${m.data}</td>
+    </tr>
+  `).join('') || '<tr><td colspan="7" class="empty-row">Nenhum movimento encontrado.</td></tr>';
+}
+
+async function loadProdutosSelect() {
+  const prods = await api('/api/produtos');
+  const sel = document.getElementById('movProduto');
+  sel.innerHTML = prods.map(p => `<option value="${p.id}">${p.nome}</option>`).join('');
+}
+
+function setFiltro(tipo, btn) {
+  filtroAtivo = tipo;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  loadMovimentos();
+}
+
+function setTipo(tipo, btn) {
+  document.getElementById('movTipo').value = tipo;
+  document.querySelectorAll('.toggle-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+}
+
+function openModal(id) { document.getElementById(id).classList.remove('hidden'); loadProdutosSelect(); }
+function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+
+async function salvarMov() {
+  const dados = {
+    produto_id: document.getElementById('movProduto').value,
+    tipo: document.getElementById('movTipo').value,
+    quantidade_kg: document.getElementById('movKg').value || 0,
+    quantidade_sacos: document.getElementById('movSacos').value || 0,
+    quantidade_caixas: document.getElementById('movCaixas').value || 0,
+    observacao: document.getElementById('movObs').value,
+  };
+  const res = await apiPost('/api/movimentos', dados);
+  if (res.erro) { toast(res.erro, 'erro'); return; }
+  toast('Movimento registrado com sucesso!');
+  closeModal('modalMov');
+  loadMovimentos();
+}
+
+loadMovimentos();
+</script>
+{% endblock %}

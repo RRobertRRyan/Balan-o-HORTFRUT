@@ -1,0 +1,175 @@
+{% extends "base.html" %}
+{% block title %}Estoque — HortFrut HORT{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Estoque <span class="accent">HORT</span></h1>
+    <p class="page-sub">Gerencie os produtos em estoque</p>
+  </div>
+  <button class="btn btn-primary" onclick="openModal('modalProduto')">+ Novo Produto</button>
+</div>
+
+<div class="card">
+  <div class="card-header">
+    <input class="search-input" type="text" placeholder="Buscar produto..." oninput="filtrarProdutos(this.value)">
+    <select class="select-input" onchange="filtrarCategoria(this.value)">
+      <option value="">Todas as categorias</option>
+      <option value="cebola_amarela">Cebola Amarela</option>
+      <option value="cebola_roxa">Cebola Roxa</option>
+      <option value="alho">Alho</option>
+      <option value="cebola_miuda">Cebola Miúda</option>
+    </select>
+  </div>
+  <table class="data-table" id="tabelaProdutos">
+    <thead>
+      <tr>
+        <th>Produto</th>
+        <th>Categoria</th>
+        <th>KG</th>
+        <th>Sacos (UN)</th>
+        <th>Caixas (UN)</th>
+        <th>Preço/KG</th>
+        <th>Atualizado</th>
+        <th>Ações</th>
+      </tr>
+    </thead>
+    <tbody id="tbodyProdutos"></tbody>
+  </table>
+</div>
+
+<!-- Modal Produto -->
+<div class="modal-overlay hidden" id="modalProduto">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="modalProdutoTitle">Novo Produto</h3>
+      <button class="modal-close" onclick="closeModal('modalProduto')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="produtoId">
+      <div class="form-group">
+        <label>Nome do Produto</label>
+        <input class="form-input" type="text" id="produtoNome" placeholder="Ex: Cebola Amarela Extra">
+      </div>
+      <div class="form-group">
+        <label>Categoria</label>
+        <select class="form-input" id="produtoCategoria">
+          <option value="cebola_amarela">Cebola Amarela</option>
+          <option value="cebola_roxa">Cebola Roxa</option>
+          <option value="alho">Alho</option>
+          <option value="cebola_miuda">Cebola Miúda</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>KG em Estoque</label>
+          <input class="form-input" type="number" id="produtoKg" placeholder="0.00" step="0.01">
+        </div>
+        <div class="form-group">
+          <label>Sacos (UN)</label>
+          <input class="form-input" type="number" id="produtoSacos" placeholder="0">
+        </div>
+        <div class="form-group">
+          <label>Caixas (UN)</label>
+          <input class="form-input" type="number" id="produtoCaixas" placeholder="0">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Preço por KG (R$)</label>
+        <input class="form-input" type="number" id="produtoPreco" placeholder="0.00" step="0.01">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('modalProduto')">Cancelar</button>
+      <button class="btn btn-primary" onclick="salvarProduto()">Salvar</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let todosProdutos = [];
+
+async function loadProdutos() {
+  todosProdutos = await api('/api/produtos');
+  renderProdutos(todosProdutos);
+}
+
+function renderProdutos(lista) {
+  const tbody = document.getElementById('tbodyProdutos');
+  const catLabels = {cebola_amarela:'Cebola Amarela', cebola_roxa:'Cebola Roxa', alho:'Alho', cebola_miuda:'Cebola Miúda'};
+  tbody.innerHTML = lista.map(p => `
+    <tr>
+      <td><strong>${p.nome}</strong></td>
+      <td><span class="cat-badge cat-${p.categoria}">${catLabels[p.categoria] || p.categoria}</span></td>
+      <td class="num">${p.unidade_kg.toFixed(2)}</td>
+      <td class="num">${p.unidade_sacos}</td>
+      <td class="num">${p.unidade_caixas}</td>
+      <td class="num">R$ ${p.preco_kg.toFixed(2)}</td>
+      <td class="date-cell">${p.atualizado_em}</td>
+      <td>
+        <div class="action-btns">
+          <button class="btn btn-sm btn-outline" onclick='editarProduto(${JSON.stringify(p)})'>Editar</button>
+          <button class="btn btn-sm btn-danger" onclick="deletarProduto(${p.id})">Excluir</button>
+        </div>
+      </td>
+    </tr>
+  `).join('') || '<tr><td colspan="8" class="empty-row">Nenhum produto cadastrado.</td></tr>';
+}
+
+function filtrarProdutos(q) {
+  const f = todosProdutos.filter(p => p.nome.toLowerCase().includes(q.toLowerCase()));
+  renderProdutos(f);
+}
+
+function filtrarCategoria(cat) {
+  const f = cat ? todosProdutos.filter(p => p.categoria === cat) : todosProdutos;
+  renderProdutos(f);
+}
+
+function openModal(id) { document.getElementById(id).classList.remove('hidden'); }
+function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+
+function editarProduto(p) {
+  document.getElementById('modalProdutoTitle').textContent = 'Editar Produto';
+  document.getElementById('produtoId').value = p.id;
+  document.getElementById('produtoNome').value = p.nome;
+  document.getElementById('produtoCategoria').value = p.categoria;
+  document.getElementById('produtoKg').value = p.unidade_kg;
+  document.getElementById('produtoSacos').value = p.unidade_sacos;
+  document.getElementById('produtoCaixas').value = p.unidade_caixas;
+  document.getElementById('produtoPreco').value = p.preco_kg;
+  openModal('modalProduto');
+}
+
+async function salvarProduto() {
+  const id = document.getElementById('produtoId').value;
+  const dados = {
+    nome: document.getElementById('produtoNome').value,
+    categoria: document.getElementById('produtoCategoria').value,
+    unidade_kg: document.getElementById('produtoKg').value || 0,
+    unidade_sacos: document.getElementById('produtoSacos').value || 0,
+    unidade_caixas: document.getElementById('produtoCaixas').value || 0,
+    preco_kg: document.getElementById('produtoPreco').value || 0,
+  };
+  const url = id ? `/api/produtos/${id}` : '/api/produtos';
+  const method = id ? 'PUT' : 'POST';
+  const res = await apiPost(url, dados, method);
+  if (res.erro) { toast(res.erro, 'erro'); return; }
+  toast('Produto salvo com sucesso!');
+  closeModal('modalProduto');
+  document.getElementById('produtoId').value = '';
+  document.getElementById('modalProdutoTitle').textContent = 'Novo Produto';
+  loadProdutos();
+}
+
+async function deletarProduto(id) {
+  if (!confirm('Excluir este produto?')) return;
+  await apiPost(`/api/produtos/${id}`, {}, 'DELETE');
+  toast('Produto excluído.');
+  loadProdutos();
+}
+
+loadProdutos();
+</script>
+{% endblock %}

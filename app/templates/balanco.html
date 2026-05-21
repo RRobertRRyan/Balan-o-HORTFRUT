@@ -1,0 +1,159 @@
+{% extends "base.html" %}
+{% block title %}Balanço — HortFrut HORT{% endblock %}
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Balanço <span class="accent">HORT</span></h1>
+    <p class="page-sub">Realize e consulte balanços de estoque</p>
+  </div>
+  <button class="btn btn-primary" onclick="iniciarBalanco()">+ Novo Balanço</button>
+</div>
+
+<!-- Formulário de novo balanço -->
+<div class="card hidden" id="formBalanco">
+  <div class="card-header">
+    <h2 class="card-title">Novo Balanço</h2>
+    <button class="btn btn-sm btn-outline" onclick="cancelarBalanco()">Cancelar</button>
+  </div>
+  <div class="form-row" style="margin-bottom:1.5rem">
+    <div class="form-group">
+      <label>Responsável</label>
+      <input class="form-input" type="text" id="balResponsavel" placeholder="Nome do responsável">
+    </div>
+    <div class="form-group">
+      <label>Observação</label>
+      <input class="form-input" type="text" id="balObs" placeholder="Opcional...">
+    </div>
+  </div>
+
+  <div class="balanco-form">
+    <div class="balanco-section">
+      <h3 class="section-title">🧅 Cebola Amarela</h3>
+      <div class="form-row">
+        <div class="form-group"><label>KG</label><input class="form-input" type="number" id="caKg" placeholder="0.00" step="0.01"></div>
+        <div class="form-group"><label>Sacos (UN)</label><input class="form-input" type="number" id="caSacos" placeholder="0"></div>
+      </div>
+    </div>
+    <div class="balanco-section">
+      <h3 class="section-title">🟣 Cebola Roxa</h3>
+      <div class="form-row">
+        <div class="form-group"><label>KG</label><input class="form-input" type="number" id="crKg" placeholder="0.00" step="0.01"></div>
+        <div class="form-group"><label>Sacos (UN)</label><input class="form-input" type="number" id="crSacos" placeholder="0"></div>
+      </div>
+    </div>
+    <div class="balanco-section">
+      <h3 class="section-title">🧄 Alho</h3>
+      <div class="form-row">
+        <div class="form-group"><label>KG</label><input class="form-input" type="number" id="alKg" placeholder="0.00" step="0.01"></div>
+        <div class="form-group"><label>Caixas (UN)</label><input class="form-input" type="number" id="alCaixas" placeholder="0"></div>
+      </div>
+    </div>
+    <div class="balanco-section">
+      <h3 class="section-title">🧅 Cebola Miúda</h3>
+      <div class="form-row">
+        <div class="form-group"><label>KG</label><input class="form-input" type="number" id="cmKg" placeholder="0.00" step="0.01"></div>
+        <div class="form-group"><label>Sacos (UN)</label><input class="form-input" type="number" id="cmSacos" placeholder="0"></div>
+      </div>
+    </div>
+  </div>
+
+  <div style="display:flex;gap:1rem;margin-top:1.5rem">
+    <button class="btn btn-primary" onclick="salvarBalanco()">💾 Salvar Balanço</button>
+    <button class="btn btn-outline" onclick="gerarPDF()">📄 Salvar e Gerar PDF</button>
+  </div>
+</div>
+
+<!-- Histórico de balanços -->
+<div class="card" id="historicoBalanco">
+  <div class="card-header">
+    <h2 class="card-title">Histórico de Balanços</h2>
+  </div>
+  <div id="listaBalancos"></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function iniciarBalanco() {
+  document.getElementById('formBalanco').classList.remove('hidden');
+  document.getElementById('formBalanco').scrollIntoView({behavior:'smooth'});
+}
+function cancelarBalanco() {
+  document.getElementById('formBalanco').classList.add('hidden');
+}
+
+async function salvarBalanco(gerar_pdf = false) {
+  const dados = {
+    responsavel: document.getElementById('balResponsavel').value,
+    observacao: document.getElementById('balObs').value,
+    itens: [
+      {produto_nome:'Cebola Amarela', categoria:'cebola_amarela', quantidade_kg: document.getElementById('caKg').value||0, quantidade_sacos: document.getElementById('caSacos').value||0},
+      {produto_nome:'Cebola Roxa', categoria:'cebola_roxa', quantidade_kg: document.getElementById('crKg').value||0, quantidade_sacos: document.getElementById('crSacos').value||0},
+      {produto_nome:'Alho', categoria:'alho', quantidade_kg: document.getElementById('alKg').value||0, quantidade_caixas: document.getElementById('alCaixas').value||0},
+      {produto_nome:'Cebola Miúda', categoria:'cebola_miuda', quantidade_kg: document.getElementById('cmKg').value||0, quantidade_sacos: document.getElementById('cmSacos').value||0},
+    ]
+  };
+  const res = await apiPost('/api/balancos', dados);
+  if (res.erro) { toast(res.erro, 'erro'); return; }
+  toast('Balanço salvo com sucesso!');
+  if (gerar_pdf) imprimirBalanco(res);
+  cancelarBalanco();
+  loadBalancos();
+}
+
+function gerarPDF() { salvarBalanco(true); }
+
+function imprimirBalanco(b) {
+  const win = window.open('', '_blank');
+  win.document.write(`
+    <html><head><title>Balanço HORT</title>
+    <style>
+      body{font-family:Arial,sans-serif;padding:40px;max-width:600px;margin:auto}
+      h1{color:#c0392b}h1 span{color:#333}
+      table{width:100%;border-collapse:collapse;margin-top:20px}
+      th,td{border:1px solid #ddd;padding:8px 12px;text-align:left}
+      th{background:#f5c518;color:#333}
+      .footer{margin-top:30px;font-size:12px;color:#999}
+    </style></head><body>
+    <h1><span>Balanço</span> HORT</h1>
+    <p><strong>Data:</strong> ${b.data_balanco} &nbsp;&nbsp; <strong>Responsável:</strong> ${b.responsavel || '—'}</p>
+    <p><strong>Obs:</strong> ${b.observacao || '—'}</p>
+    <table><thead><tr><th>Produto</th><th>KG</th><th>Sacos</th><th>Caixas</th></tr></thead>
+    <tbody>${b.itens.map(i=>`<tr><td>${i.produto_nome}</td><td>${i.quantidade_kg}</td><td>${i.quantidade_sacos}</td><td>${i.quantidade_caixas}</td></tr>`).join('')}</tbody></table>
+    <div class="footer">Gerado pelo sistema HortFrut HORT</div>
+    </body></html>
+  `);
+  win.document.close();
+  win.print();
+}
+
+async function loadBalancos() {
+  const balancos = await api('/api/balancos');
+  const el = document.getElementById('listaBalancos');
+  el.innerHTML = balancos.map(b => `
+    <div class="balanco-item">
+      <div class="balanco-item-header">
+        <div>
+          <strong>Balanço #${b.id}</strong>
+          <span class="date-cell">${b.data_balanco}</span>
+          ${b.responsavel ? `<span class="badge-resp">${b.responsavel}</span>` : ''}
+        </div>
+        <button class="btn btn-sm btn-outline" onclick='imprimirBalanco(${JSON.stringify(b)})'>📄 PDF</button>
+      </div>
+      <div class="balanco-item-body">
+        ${b.itens.map(i => `
+          <div class="bi-row">
+            <span>${i.produto_nome}</span>
+            <span class="badge badge-kg">${i.quantidade_kg} kg</span>
+            ${i.quantidade_sacos > 0 ? `<span class="badge badge-sacos">${i.quantidade_sacos} sc</span>` : ''}
+            ${i.quantidade_caixas > 0 ? `<span class="badge badge-caixas">${i.quantidade_caixas} cx</span>` : ''}
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `).join('') || '<p class="empty" style="padding:2rem">Nenhum balanço registrado.</p>';
+}
+
+loadBalancos();
+</script>
+{% endblock %}
